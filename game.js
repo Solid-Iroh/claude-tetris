@@ -121,6 +121,11 @@ function lockPiece() {
   const rows = clearLines();
   if (!rows.length) sfx.lock();
   scoreLock(rows.length, tspin, rows);
+  if (rows.length === 4 && specialsEnabled) {
+    queueFront(makePiece(SINGLE));
+    addPopup('¡RECOMPENSA!', '#fff176');
+    sfx.reward();
+  }
   spawn();
 }
 
