@@ -39,6 +39,16 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeToggle = document.getElementById('theme-toggle');
+
+const GRID_COLORS = { dark: '#22222e', light: '#e3e6f0' };
+const BLOCK_SHINE = { dark: 'rgba(255,255,255,0.12)', light: 'rgba(255,255,255,0.35)' };
+// Paleta con más contraste para fondo claro
+const COLORS_LIGHT = [
+  null,
+  '#00acc1', '#f9a825', '#8e24aa', '#43a047', '#e53935', '#1e88e5', '#fb8c00',
+];
+let theme = 'dark';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
@@ -158,18 +168,18 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const color = (theme === 'light' ? COLORS_LIGHT : COLORS)[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillStyle = BLOCK_SHINE[theme];
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = GRID_COLORS[theme];
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -216,6 +226,18 @@ function drawNext() {
   for (let r = 0; r < shape.length; r++)
     for (let c = 0; c < shape[r].length; c++)
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
+}
+
+function setTheme(t, save = true) {
+  theme = t === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  themeToggle.textContent = theme === 'light' ? '🌙 Oscuro' : '☀️ Claro';
+  themeToggle.setAttribute('aria-pressed', String(theme === 'light'));
+  if (save) {
+    try { localStorage.setItem('theme', theme); } catch (e) {}
+  }
+  // El bucle está detenido en pausa/game over: repintar manualmente
+  if (current && next) { draw(); drawNext(); }
 }
 
 function endGame() {
@@ -300,5 +322,13 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+themeToggle.addEventListener('click', () => {
+  setTheme(theme === 'light' ? 'dark' : 'light');
+  themeToggle.blur(); // evita que Space active el botón
+});
+
+let savedTheme = 'dark';
+try { savedTheme = localStorage.getItem('theme') || 'dark'; } catch (e) {}
+setTheme(savedTheme, false);
 
 init();

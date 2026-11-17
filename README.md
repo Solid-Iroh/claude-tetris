@@ -42,6 +42,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- **Tema claro/oscuro**: oscuro por defecto; el botón de la esquina superior derecha alterna el tema y se recuerda en `localStorage`.
 
 ---
 
@@ -157,7 +158,7 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 ```
 03-tetris/
 ├── index.html      # Estructura del DOM y canvas
-├── style.css       # Estilos del juego (dark theme)
+├── style.css       # Estilos del juego (variables CSS, tema oscuro y claro)
 ├── game.js         # Toda la lógica del Tetris (~300 líneas)
 └── README.md
 ```
