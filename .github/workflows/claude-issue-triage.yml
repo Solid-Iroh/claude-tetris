@@ -73,5 +73,6 @@ jobs:
                - **Propuesta de solución** (pasos concretos, sin escribir el código final)
                - **Riesgos / casos borde**
                - **Preguntas abiertas**
+            FORMATO: todo lo que comentes debe estar en Markdown válido y compatible con GitHub (GFM): encabezados con `#`, listas con `-`, código en bloques con triple backtick y lenguaje (```js), código inline con backticks, y referencias a archivos/líneas entre backticks. Evita HTML salvo el comentario marcador inicial.
             5. Publícalo con `gh issue comment ${{ github.event.issue.number }} --edit-last --create-if-none --body "<diagnóstico>"` para que en ediciones se actualice el mismo comentario en lugar de crear otro.
             No modifiques archivos del repositorio.
