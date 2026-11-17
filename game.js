@@ -1,39 +1,11 @@
 'use strict';
 
-const COLS = 10;
-const ROWS = 20;
-const BLOCK = 30;
-
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#90caf9', // J - pale blue
-  '#ffb74d', // L - orange
-  '#b0bec5', // Tuerca - gris metálico
-];
-
-const PIECES = [
-  null,
-  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
-  [[2,2],[2,2]],                               // O
-  [[0,3,0],[3,3,3],[0,0,0]],                  // T
-  [[0,4,4],[4,4,0],[0,0,0]],                  // S
-  [[5,5,0],[0,5,5],[0,0,0]],                  // Z
-  [[6,0,0],[6,6,6],[0,0,0]],                  // J
-  [[0,0,7],[7,7,7],[0,0,0]],                  // L
-  [[8,8,8],[8,0,8],[8,8,8]],                  // Tuerca (hueco en el centro)
-];
-
-const LINE_SCORES = [0, 100, 300, 500, 800];
-
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
 const nextCtx = nextCanvas.getContext('2d');
+const holdCanvas = document.getElementById('hold-canvas');
+const holdCtx = holdCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
@@ -45,23 +17,22 @@ const themeToggle = document.getElementById('theme-toggle');
 
 const GRID_COLORS = { dark: '#22222e', light: '#e3e6f0' };
 const BLOCK_SHINE = { dark: 'rgba(255,255,255,0.12)', light: 'rgba(255,255,255,0.35)' };
-// Paleta con más contraste para fondo claro
-const COLORS_LIGHT = [
-  null,
-  '#00acc1', '#f9a825', '#8e24aa', '#43a047', '#e53935', '#1e88e5', '#fb8c00', '#78909c',
-];
 let theme = 'dark';
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 }
 
-function randomPiece() {
-  const type = Math.floor(Math.random() * (PIECES.length - 1)) + 1;
-  const shape = PIECES[type].map(row => [...row]);
-  return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+function refillQueue() {
+  while (queue.length < 6) {
+    for (const type of newBag()) queue.push(makePiece(type));
+  }
+}
+
+function queueFront(piece) {
+  queue.unshift(piece);
 }
 
 function collide(shape, ox, oy) {
@@ -154,12 +125,34 @@ function lockPiece() {
 }
 
 function spawn() {
-  current = next;
-  next = randomPiece();
+  current = queue.shift();
+  refillQueue();
+  holdCharges = 1;
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
   drawNext();
+  drawHold();
+}
+
+function doHold() {
+  if (holdCharges <= 0) return;
+  holdCharges--;
+  const stored = { type: current.type, power: current.power };
+  if (hold) {
+    const charges = holdCharges;
+    current = makePiece(hold.type, hold.power);
+    hold = stored;
+    holdCharges = charges;
+    if (collide(current.shape, current.x, current.y)) endGame();
+  } else {
+    hold = stored;
+    const charges = holdCharges;
+    spawn();
+    holdCharges = charges;
+  }
+  drawNext();
+  drawHold();
 }
 
 function updateHUD() {
@@ -219,15 +212,25 @@ function draw() {
       drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
 }
 
-function drawNext() {
-  const NB = 30;
-  nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-  const shape = next.shape;
-  const offX = Math.floor((4 - shape[0].length) / 2);
-  const offY = Math.floor((4 - shape.length) / 2);
+function drawPreview(c2d, cv, shape, alpha) {
+  c2d.clearRect(0, 0, cv.width, cv.height);
+  if (!shape) return;
+  const dim = Math.max(shape.length, shape[0].length);
+  const size = Math.min(30, Math.floor(cv.width / (dim + 1)));
+  const offX = (cv.width / size - shape[0].length) / 2;
+  const offY = (cv.height / size - shape.length) / 2;
   for (let r = 0; r < shape.length; r++)
     for (let c = 0; c < shape[r].length; c++)
-      drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
+      drawBlock(c2d, offX + c, offY + r, shape[r][c], size, alpha);
+}
+
+function drawNext() {
+  drawPreview(nextCtx, nextCanvas, queue[0].shape);
+}
+
+function drawHold() {
+  holdCanvas.classList.toggle('locked', holdCharges <= 0);
+  drawPreview(holdCtx, holdCanvas, hold ? PIECES[hold.type] : null);
 }
 
 function setTheme(t, save = true) {
@@ -239,7 +242,7 @@ function setTheme(t, save = true) {
     try { localStorage.setItem('theme', theme); } catch (e) {}
   }
   // El bucle está detenido en pausa/game over: repintar manualmente
-  if (current && next) { draw(); drawNext(); }
+  if (current && queue) { draw(); drawNext(); drawHold(); }
 }
 
 function endGame() {
@@ -292,7 +295,10 @@ function init() {
   dropInterval = 1000;
   dropAccum = 0;
   lastTime = performance.now();
-  next = randomPiece();
+  queue = [];
+  hold = null;
+  holdCharges = 1;
+  refillQueue();
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
@@ -321,18 +327,11 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       hardDrop();
       break;
+    case 'KeyC':
+    case 'ShiftLeft':
+    case 'ShiftRight':
+      doHold();
+      break;
   }
   updateHUD();
 });
-
-restartBtn.addEventListener('click', init);
-themeToggle.addEventListener('click', () => {
-  setTheme(theme === 'light' ? 'dark' : 'light');
-  themeToggle.blur(); // evita que Space active el botón
-});
-
-let savedTheme = 'dark';
-try { savedTheme = localStorage.getItem('theme') || 'dark'; } catch (e) {}
-setTheme(savedTheme, false);
-
-init();
