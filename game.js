@@ -117,10 +117,13 @@ function softDrop() {
 
 function lockPiece() {
   const tspin = detectTSpin();
-  merge();
+  if (current.power) applyPowerUp(current);
+  else merge();
   const rows = clearLines();
   if (!rows.length) sfx.lock();
+  else popWildcards();
   scoreLock(rows.length, tspin, rows);
+  trackPowerSpawn(rows.length);
   if (rows.length === 4 && specialsEnabled) {
     queueFront(makePiece(SINGLE));
     addPopup('¡RECOMPENSA!', '#fff176');
@@ -161,6 +164,12 @@ function doHold() {
   drawHold();
 }
 
+// Intervalo efectivo: base por nivel × modificadores (congelar detiene la caída).
+function currentDropInterval() {
+  if (isFrozen()) return Infinity;
+  return dropInterval;
+}
+
 function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
@@ -168,15 +177,26 @@ function updateHUD() {
   if (comboEl) comboEl.textContent = combo >= 1 ? 'x' + (combo + 1) : '-';
 }
 
-function drawBlock(context, x, y, colorIndex, size, alpha) {
+function drawBlock(context, x, y, colorIndex, size, alpha, power) {
   if (!colorIndex) return;
-  const color = (theme === 'light' ? COLORS_LIGHT : COLORS)[colorIndex];
+  let color = (theme === 'light' ? COLORS_LIGHT : COLORS)[colorIndex];
+  if (power) color = POWERUPS[power].color;
+  else if (colorIndex === WILDCARD) color = `hsl(${(gameTime / 8 + x * 40 + y * 25) % 360}, 80%, 60%)`;
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
   context.fillStyle = BLOCK_SHINE[theme];
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  if (power) {
+    context.font = `${Math.floor(size * 0.65)}px system-ui, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = '#000';
+    context.fillText(POWERUPS[power].emoji, x * size + size / 2, y * size + size / 2 + 1);
+    context.textAlign = 'start';
+    context.textBaseline = 'alphabetic';
+  }
   context.globalAlpha = 1;
 }
 
@@ -211,17 +231,17 @@ function draw() {
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       if (current.shape[r][c])
-        drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
+        drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2, current.power);
 
   // current piece
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
-      drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+      drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK, 1, current.power);
 
   drawEffects();
 }
 
-function drawPreview(c2d, cv, shape, alpha) {
+function drawPreview(c2d, cv, shape, alpha, power) {
   c2d.clearRect(0, 0, cv.width, cv.height);
   if (!shape) return;
   const dim = Math.max(shape.length, shape[0].length);
@@ -230,16 +250,16 @@ function drawPreview(c2d, cv, shape, alpha) {
   const offY = (cv.height / size - shape.length) / 2;
   for (let r = 0; r < shape.length; r++)
     for (let c = 0; c < shape[r].length; c++)
-      drawBlock(c2d, offX + c, offY + r, shape[r][c], size, alpha);
+      drawBlock(c2d, offX + c, offY + r, shape[r][c], size, alpha, power);
 }
 
 function drawNext() {
-  drawPreview(nextCtx, nextCanvas, queue[0].shape);
+  drawPreview(nextCtx, nextCanvas, queue[0].shape, 1, queue[0].power);
 }
 
 function drawHold() {
   holdCanvas.classList.toggle('locked', holdCharges <= 0);
-  drawPreview(holdCtx, holdCanvas, hold ? PIECES[hold.type] : null);
+  drawPreview(holdCtx, holdCanvas, hold ? PIECES[hold.type] : null, 1, hold && hold.power);
 }
 
 function setTheme(t, save = true) {
@@ -282,7 +302,7 @@ function loop(ts) {
   lastTime = ts;
   gameTime += dt;
   dropAccum += dt;
-  if (dropAccum >= dropInterval) {
+  if (dropAccum >= currentDropInterval()) {
     dropAccum = 0;
     if (!collide(current.shape, current.x, current.y + 1)) {
       current.y++;
@@ -301,6 +321,7 @@ function init() {
   gameTime = 0;
   lastMoveWasRotate = false;
   resetScoring();
+  resetPowerups();
   score = 0;
   lines = 0;
   level = 1;
