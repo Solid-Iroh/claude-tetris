@@ -19,7 +19,7 @@ const GRID_COLORS = { dark: '#22222e', light: '#e3e6f0' };
 const BLOCK_SHINE = { dark: 'rgba(255,255,255,0.12)', light: 'rgba(255,255,255,0.35)' };
 let theme = 'dark';
 
-let gameTime, lastMoveWasRotate, board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let pieceStartScore, gameTime, lastMoveWasRotate, board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -116,6 +116,7 @@ function softDrop() {
 }
 
 function lockPiece() {
+  snapshotForUndo();
   const tspin = detectTSpin();
   if (current.power) applyPowerUp(current);
   else merge();
@@ -123,6 +124,7 @@ function lockPiece() {
   if (!rows.length) sfx.lock();
   else popWildcards();
   scoreLock(rows.length, tspin, rows);
+  gainEnergy(rows.length, tspin);
   trackPowerSpawn(rows.length);
   if (rows.length === 4 && specialsEnabled) {
     queueFront(makePiece(SINGLE));
@@ -137,6 +139,8 @@ function spawn() {
   refillQueue();
   holdCharges = 1;
   lastMoveWasRotate = false;
+  if (peekPieces > 0) peekPieces--;
+  pieceStartScore = score;
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
@@ -167,13 +171,14 @@ function doHold() {
 // Intervalo efectivo: base por nivel × modificadores (congelar detiene la caída).
 function currentDropInterval() {
   if (isFrozen()) return Infinity;
-  return dropInterval;
+  return isSlowed() ? dropInterval * SLOW_FACTOR : dropInterval;
 }
 
 function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  updateEnergyBar();
   if (comboEl) comboEl.textContent = combo >= 1 ? 'x' + (combo + 1) : '-';
 }
 
@@ -241,20 +246,34 @@ function draw() {
   drawEffects();
 }
 
-function drawPreview(c2d, cv, shape, alpha, power) {
-  c2d.clearRect(0, 0, cv.width, cv.height);
+function drawPreview(c2d, cv, shape, alpha, power, region) {
+  const rg = region || { x: 0, y: 0, w: cv.width, h: cv.height };
+  c2d.clearRect(rg.x, rg.y, rg.w, rg.h);
   if (!shape) return;
-  const dim = Math.max(shape.length, shape[0].length);
-  const size = Math.min(30, Math.floor(cv.width / (dim + 1)));
-  const offX = (cv.width / size - shape[0].length) / 2;
-  const offY = (cv.height / size - shape.length) / 2;
-  for (let r = 0; r < shape.length; r++)
-    for (let c = 0; c < shape[r].length; c++)
-      drawBlock(c2d, offX + c, offY + r, shape[r][c], size, alpha, power);
+  const rows = shape.length, cols = shape[0].length;
+  const size = Math.min(30, Math.floor(rg.w / (Math.max(rows, cols) + 1)), Math.floor(rg.h / (rows + 1)));
+  const ox = rg.x + (rg.w - cols * size) / 2;
+  const oy = rg.y + (rg.h - rows * size) / 2;
+  c2d.save();
+  c2d.translate(ox, oy);
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      drawBlock(c2d, c, r, shape[r][c], size, alpha, power);
+  c2d.restore();
 }
 
 function drawNext() {
-  drawPreview(nextCtx, nextCanvas, queue[0].shape, 1, queue[0].power);
+  const peek = peekPieces > 0;
+  const h = peek ? 300 : 120;
+  if (nextCanvas.height !== h) nextCanvas.height = h;
+  if (!peek) {
+    drawPreview(nextCtx, nextCanvas, queue[0].shape, 1, queue[0].power);
+    return;
+  }
+  nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+  for (let i = 0; i < 5; i++) {
+    drawPreview(nextCtx, nextCanvas, queue[i].shape, 1, queue[i].power, { x: 0, y: i * 60, w: 120, h: 60 });
+  }
 }
 
 function drawHold() {
@@ -322,6 +341,7 @@ function init() {
   lastMoveWasRotate = false;
   resetScoring();
   resetPowerups();
+  resetAbilities();
   score = 0;
   lines = 0;
   level = 1;
@@ -343,6 +363,7 @@ function init() {
 
 document.addEventListener('keydown', e => {
   ensureAudio();
+  if (abilityMenu) { handleAbilityKey(e); return; }
   if (e.code === 'KeyM') { toggleMute(); return; }
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
@@ -363,6 +384,9 @@ document.addEventListener('keydown', e => {
     case 'Space':
       e.preventDefault();
       hardDrop();
+      break;
+    case 'KeyE':
+      openAbilityMenu();
       break;
     case 'KeyC':
     case 'ShiftLeft':

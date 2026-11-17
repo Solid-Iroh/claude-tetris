@@ -239,3 +239,49 @@ kbd {
   60% { transform: translate(-3px, -2px); }
   80% { transform: translate(3px, 2px); }
 }
+
+/* ---- Energía y menú de habilidades ---- */
+#energy-bar {
+  height: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--board-bg);
+  overflow: hidden;
+}
+
+#energy-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+#energy-bar.full {
+  border-color: var(--accent);
+  animation: glow 1s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 2px var(--accent); }
+  to { box-shadow: 0 0 10px var(--accent); }
+}
+
+#ability-menu .menu-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+
+#ability-menu .menu-item {
+  font-size: 14px;
+}
+
+#ability-menu .menu-item.disabled {
+  opacity: 0.35;
+}
+
+#ability-menu .menu-hint {
+  font-size: 11px;
+  color: var(--muted);
+}

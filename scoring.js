@@ -115,5 +115,6 @@ function drawEffects() {
   ctx.textAlign = 'start';
 
   drawPowerStatus();
+  drawAbilityStatus();
   canvas.classList.toggle('shake', gameTime < shakeUntil);
 }
