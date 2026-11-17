@@ -34,6 +34,11 @@
         </div>
 
         <div class="panel-section">
+          <span class="label">COMBO</span>
+          <span class="value" id="combo">-</span>
+        </div>
+
+        <div class="panel-section">
           <span class="label">NEXT</span>
           <canvas id="next-canvas" width="120" height="120"></canvas>
         </div>
@@ -52,6 +57,7 @@
             <li><kbd>Space</kbd> caída</li>
             <li><kbd>C</kbd>/<kbd>Shift</kbd> reservar</li>
             <li><kbd>P</kbd> pausa</li>
+            <li><kbd>M</kbd> sonido <span id="mute-state">on</span></li>
           </ul>
         </div>
       </aside>
@@ -68,7 +74,9 @@
   </div>
 
   <script src="pieces.js"></script>
+  <script src="audio.js"></script>
   <script src="game.js"></script>
+  <script src="scoring.js"></script>
   <script src="main.js"></script>
 </body>
 </html>

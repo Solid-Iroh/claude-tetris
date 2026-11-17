@@ -11,3 +11,5 @@ try { savedTheme = localStorage.getItem('theme') || 'dark'; } catch (e) {}
 setTheme(savedTheme, false);
 
 init();
+
+document.getElementById('mute-state').textContent = muted ? 'off' : 'on';

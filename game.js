@@ -19,7 +19,7 @@ const GRID_COLORS = { dark: '#22222e', light: '#e3e6f0' };
 const BLOCK_SHINE = { dark: 'rgba(255,255,255,0.12)', light: 'rgba(255,255,255,0.35)' };
 let theme = 'dark';
 
-let board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let gameTime, lastMoveWasRotate, board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -64,6 +64,7 @@ function tryRotate() {
     if (!collide(rotated, current.x + kick, current.y)) {
       current.shape = rotated;
       current.x += kick;
+      lastMoveWasRotate = true;
       return;
     }
   }
@@ -77,22 +78,16 @@ function merge() {
 }
 
 function clearLines() {
-  let cleared = 0;
+  const rows = [];
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(v => v !== 0)) {
       board.splice(r, 1);
       board.unshift(new Array(COLS).fill(0));
-      cleared++;
+      rows.push(r);
       r++;
     }
   }
-  if (cleared) {
-    lines += cleared;
-    score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
-    updateHUD();
-  }
+  return rows;
 }
 
 function ghostY() {
@@ -104,6 +99,7 @@ function ghostY() {
 function hardDrop() {
   const gy = ghostY();
   score += (gy - current.y) * 2;
+  if (gy !== current.y) lastMoveWasRotate = false;
   current.y = gy;
   lockPiece();
 }
@@ -111,6 +107,7 @@ function hardDrop() {
 function softDrop() {
   if (!collide(current.shape, current.x, current.y + 1)) {
     current.y++;
+    lastMoveWasRotate = false;
     score += 1;
     updateHUD();
   } else {
@@ -119,8 +116,11 @@ function softDrop() {
 }
 
 function lockPiece() {
+  const tspin = detectTSpin();
   merge();
-  clearLines();
+  const rows = clearLines();
+  if (!rows.length) sfx.lock();
+  scoreLock(rows.length, tspin, rows);
   spawn();
 }
 
@@ -128,6 +128,7 @@ function spawn() {
   current = queue.shift();
   refillQueue();
   holdCharges = 1;
+  lastMoveWasRotate = false;
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
@@ -159,6 +160,7 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  if (comboEl) comboEl.textContent = combo >= 1 ? 'x' + (combo + 1) : '-';
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -210,6 +212,8 @@ function draw() {
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+
+  drawEffects();
 }
 
 function drawPreview(c2d, cv, shape, alpha) {
@@ -271,11 +275,13 @@ function loop(ts) {
   if (gameOver || paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
+  gameTime += dt;
   dropAccum += dt;
   if (dropAccum >= dropInterval) {
     dropAccum = 0;
     if (!collide(current.shape, current.x, current.y + 1)) {
       current.y++;
+      lastMoveWasRotate = false;
     } else {
       lockPiece();
     }
@@ -287,6 +293,9 @@ function loop(ts) {
 
 function init() {
   board = createBoard();
+  gameTime = 0;
+  lastMoveWasRotate = false;
+  resetScoring();
   score = 0;
   lines = 0;
   level = 1;
@@ -307,14 +316,16 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
+  ensureAudio();
+  if (e.code === 'KeyM') { toggleMute(); return; }
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
-      if (!collide(current.shape, current.x - 1, current.y)) current.x--;
+      if (!collide(current.shape, current.x - 1, current.y)) { current.x--; lastMoveWasRotate = false; }
       break;
     case 'ArrowRight':
-      if (!collide(current.shape, current.x + 1, current.y)) current.x++;
+      if (!collide(current.shape, current.x + 1, current.y)) { current.x++; lastMoveWasRotate = false; }
       break;
     case 'ArrowDown':
       softDrop();
