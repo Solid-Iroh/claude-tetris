@@ -136,7 +136,7 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
     } else if (e.key === 'F7') {
       e.preventDefault();
       lines += 9;
-      level = Math.floor(lines / 10) + 1;
+      level = startLevel + Math.floor(lines / 10);
       updateHUD();
     }
   });

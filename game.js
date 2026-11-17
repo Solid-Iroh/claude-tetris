@@ -19,7 +19,7 @@ const GRID_COLORS = { dark: '#22222e', light: '#e3e6f0' };
 const BLOCK_SHINE = { dark: 'rgba(255,255,255,0.12)', light: 'rgba(255,255,255,0.35)' };
 let theme = 'dark';
 
-let pieceStartScore, gameTime, lastMoveWasRotate, board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let mode, startLevel = 1, pieceStartScore, gameTime, lastMoveWasRotate, board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -57,8 +57,13 @@ function rotateCW(shape) {
   return result;
 }
 
+function rotateCCW(shape) {
+  return rotateCW(rotateCW(rotateCW(shape)));
+}
+
 function tryRotate() {
-  const rotated = rotateCW(current.shape);
+  const reversed = mode.reverseRotation && level >= REVERSE_FROM_LEVEL;
+  const rotated = reversed ? rotateCCW(current.shape) : rotateCW(current.shape);
   const kicks = [0, -1, 1, -2, 2];
   for (const kick of kicks) {
     if (!collide(rotated, current.x + kick, current.y)) {
@@ -119,12 +124,13 @@ function lockPiece() {
   snapshotForUndo();
   const tspin = detectTSpin();
   if (current.power) applyPowerUp(current);
-  else merge();
+  else { mode.onPlace(current); merge(); }
   const rows = clearLines();
   if (!rows.length) sfx.lock();
   else popWildcards();
   scoreLock(rows.length, tspin, rows);
   gainEnergy(rows.length, tspin);
+  mode.onLock(rows.length);
   trackPowerSpawn(rows.length);
   if (rows.length === 4 && specialsEnabled) {
     queueFront(makePiece(SINGLE));
@@ -229,7 +235,7 @@ function draw() {
   // board
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
-      drawBlock(ctx, c, r, board[r][c], BLOCK);
+      if (cellVisible(r, c)) drawBlock(ctx, c, r, board[r][c], BLOCK);
 
   // ghost
   const gy = ghostY();
@@ -293,11 +299,15 @@ function setTheme(t, save = true) {
   if (current && queue) { draw(); drawNext(); drawHold(); }
 }
 
-function endGame() {
+function endGame(win = false) {
+  if (gameOver) return;
   gameOver = true;
   cancelAnimationFrame(animId);
-  overlayTitle.textContent = 'GAME OVER';
-  overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  overlay.classList.toggle('win', win);
+  overlayTitle.textContent = win ? '¡OBJETIVO CUMPLIDO!' : (mode.lossReason || 'GAME OVER');
+  let text = `Puntuación: ${score.toLocaleString()}`;
+  if (mode.id !== 'marathon') text += ` · Tiempo: ${fmtTime(gameTime)}`;
+  overlayScore.textContent = text;
   overlay.classList.remove('hidden');
 }
 
@@ -330,12 +340,23 @@ function loop(ts) {
       lockPiece();
     }
   }
+  mode.onTick(dt);
+  const result = mode.check();
+  if (result && !gameOver) endGame(result === 'win');
+  updateModeHUD();
   draw();
   if (gameOver) return; // endGame() ocurrió dentro de este frame: no reprogramar
   animId = requestAnimationFrame(loop);
 }
 
-function init() {
+function init(m) {
+  if (m && m.id) mode = m;
+  specialsEnabled = mode.flags.specials;
+  powerupsEnabled = mode.flags.powerups;
+  abilitiesEnabled = mode.flags.abilities;
+  document.getElementById('energy-section').classList.toggle('hidden', !abilitiesEnabled);
+  overlay.classList.remove('win');
+  startLevel = mode.startLevel || 1;
   board = createBoard();
   gameTime = 0;
   lastMoveWasRotate = false;
@@ -344,18 +365,20 @@ function init() {
   resetAbilities();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
   lastTime = performance.now();
   queue = [];
   hold = null;
   holdCharges = 1;
+  mode.setup();
   refillQueue();
   spawn();
   updateHUD();
+  updateModeHUD();
   overlay.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);

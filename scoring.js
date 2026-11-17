@@ -82,7 +82,7 @@ function scoreLock(cleared, tspin, rows) {
 
   flashRows = rows.map(r => ({ r, until: gameTime + 250 }));
   lines += cleared;
-  level = Math.floor(lines / 10) + 1;
+  level = startLevel + Math.floor(lines / 10);
   dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   updateHUD();
 }

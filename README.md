@@ -44,6 +44,16 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Pausa** y **Game Over** con opción de reinicio.
 - **Tema claro/oscuro**: oscuro por defecto; el botón de la esquina superior derecha alterna el tema y se recuerda en `localStorage`.
 
+Funcionalidades añadidas:
+
+- **Hold**: `C` o `Shift` reserva la pieza actual (o la intercambia con la reservada). Solo una vez por pieza; el slot se atenúa cuando está bloqueado.
+- **Combos y multiplicadores**: limpiar líneas en bloqueos consecutivos multiplica la puntuación (x2, x3…). Bonus por **T-spin**, **B2B** (Tetris/T-spin seguidos, ×1,5) y **Perfect Clear**. Textos flotantes, destellos, temblor y sonido (`M` silencia).
+- **Piezas no estándar**: pentominós **+**, **U** e **Y** y la **Tuerca** (3×3 hueca) aparecen ocasionalmente; tras un Tetris llega una pieza **1×1** de recompensa.
+- **Power-ups** (cada 5 líneas, pieza 1×1 con emoji): 💣 Bomba (3×3), ⚡ Rayo (fila y columna), 🎨 Tinte (el color del bloque de debajo se vuelve comodín; los comodines se eliminan como bonus al limpiar una línea), 🧲 Gravedad (compacta huecos), ❄️ Congelar (5 s sin caída).
+- **Habilidades**: la barra de energía se llena al limpiar líneas; con `E` (barra llena) eliges: ver 5 siguientes, intercambiar pieza, ralentizar 10 s, deshacer la última colocación o Hold extra.
+- **Menú de modos**: Maratón (todo lo anterior) y 5 desafíos: Sprint (40 líneas en 2:00), Basura (sobrevive 2:00 con basura cada 10 s), Bloques fijos, Invisibles (30 líneas) y Rotación inversa (llega al nivel 8).
+- **Modo depuración** (`?debug=1`): `F1`–`F5` encolan cada power-up, `F6` llena la energía, `F7` suma 9 líneas.
+
 ---
 
 ## Cómo ejecutar el juego
@@ -85,6 +95,9 @@ Después abre `http://localhost:8000` en el navegador.
 | `↑` o `X` | Rotar la pieza en sentido horario |
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
+| `C` / `Shift` | Reservar / intercambiar pieza (Hold) |
+| `E`       | Menú de habilidades (barra llena); `1`–`5` elige, `Esc` cancela |
+| `M`       | Silenciar / activar sonido        |
 | `P`       | Pausar / reanudar                 |
 
 ---
@@ -159,7 +172,14 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 03-tetris/
 ├── index.html      # Estructura del DOM y canvas
 ├── style.css       # Estilos del juego (variables CSS, tema oscuro y claro)
-├── game.js         # Toda la lógica del Tetris (~300 líneas)
+├── pieces.js       # Constantes, colores, formas, makePiece y bolsa 7-bag
+├── audio.js        # Efectos de sonido (Web Audio)
+├── game.js         # Núcleo: tablero, colisiones, bucle, hold, dibujo, input
+├── scoring.js      # Combos, T-spin, B2B, Perfect Clear y efectos visuales
+├── powerups.js     # Power-ups
+├── abilities.js    # Energía, habilidades y deshacer
+├── challenges.js   # Modos de juego y menú
+├── main.js         # Arranque y listeners de botones
 └── README.md
 ```
 
