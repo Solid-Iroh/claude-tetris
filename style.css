@@ -234,3 +234,62 @@ kbd {
 #restart-btn:hover {
   background: #9bbdff;
 }
+
+/* ---- Menú de pausa ---- */
+.pm-box { min-width: 220px; }
+
+#pm-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #e57373;
+}
+
+.pm-box button.pm-item,
+.pm-level {
+  width: 100%;
+  background: #7aa2f7;
+  color: #0f0f17;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.pm-item:focus { outline: none; border-color: #ffd54f; box-shadow: 0 0 8px #ffd54f; }
+
+.pm-level {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.pm-level button {
+  background: #0f0f17;
+  color: #7aa2f7;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#pm-level-value { min-width: 20px; text-align: center; font-family: 'Courier New', monospace; font-size: 16px; }
+
+#pm-controls {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 2;
+}
+
+#pm-controls.hidden { display: none; }

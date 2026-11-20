@@ -13,9 +13,11 @@ python3 -m http.server 8000      # then visit http://localhost:8000
 
 ## Architecture
 
-Three files, no framework, no bundler:
+Four files, no framework, no bundler:
 
-- **`index.html`** — DOM structure: `<canvas id="board">` (300×600px) for the playfield, `<canvas id="next-canvas">` (120×120px) for the preview, sidebar HUD (`#score`, `#lines`, `#level`), and a shared overlay `#overlay` for both PAUSE and GAME OVER states.
+- **`pause.js`** — Pause menu (`#pause-menu` overlay): Reanudar/Reiniciar/Ver controles/Nivel inicial (1-15, `localStorage['tetris-start-level']`, read via `getStartLevel()` in `init()`/`clearLines()`). Loaded before `game.js`; its capture-phase keydown handler handles P/Escape, menu navigation, and blocks game input while paused and for 150 ms after resume.
+
+- **`index.html`** — DOM structure: `<canvas id="board">` (300×600px) for the playfield, `<canvas id="next-canvas">` (120×120px) for the preview, sidebar HUD (`#score`, `#lines`, `#level`), and an overlay `#overlay` for GAME OVER (pause uses `#pause-menu`, see `pause.js`). The starting level (`baseLevel`) is fixed at `init()`; level = `max(baseLevel, floor(lines/10)+1)`.
 - **`style.css`** — Dark/retro arcade theme; uses CSS variables, flexbox, and `backdrop-filter` on overlays.
 - **`game.js`** — All game logic (~305 lines, `'use strict'`, no modules).
 
