@@ -13,10 +13,11 @@ python3 -m http.server 8000      # then visit http://localhost:8000
 
 ## Architecture
 
-Three files, no framework, no bundler:
+Four files, no framework, no bundler:
 
 - **`index.html`** — DOM structure: `<canvas id="board">` (300×600px) for the playfield, `<canvas id="next-canvas">` (120×120px) for the preview, sidebar HUD (`#score`, `#lines`, `#level`), and a shared overlay `#overlay` for both PAUSE and GAME OVER states.
 - **`style.css`** — Dark/retro arcade theme; uses CSS variables, flexbox, and `backdrop-filter` on overlays.
+- **`skins.js`** — `SKINS` registry (`retro`, `neon`, `pastel`, `pixel`), each with `colors[1–8]`, `bg` (null = CSS theme bg), `grid` (null = `--grid-line`) and `drawBlock(ctx,x,y,colorIndex,size,alpha)`. Exposes `activeSkin`/`setSkin(name, persist)`; preference in `localStorage['tetris-skin']`. Loaded before `game.js`; `game.js` `drawBlock`/`drawGrid`/`clearCanvas` delegate to `activeSkin`. Skin colors live here (the `COLORS` constant in game.js is now only the legacy base palette).
 - **`game.js`** — All game logic (~305 lines, `'use strict'`, no modules).
 
 ### game.js internals
@@ -40,4 +41,4 @@ Three files, no framework, no bundler:
 
 ## Tunable constants (top of game.js)
 
-`COLS` (10), `ROWS` (20), `BLOCK` (30 px), `COLORS` (array indexed 1–7), `LINE_SCORES`. If you change `COLS`/`ROWS`/`BLOCK`, update the canvas `width`/`height` attributes in `index.html` to match (`COLS×BLOCK` and `ROWS×BLOCK`).
+`COLS` (10), `ROWS` (20), `BLOCK` (30 px), `COLORS` (legacy base palette; active colors live in `SKINS` in skins.js), `LINE_SCORES`. If you change `COLS`/`ROWS`/`BLOCK`, update the canvas `width`/`height` attributes in `index.html` to match (`COLS×BLOCK` and `ROWS×BLOCK`).

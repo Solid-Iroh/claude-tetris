@@ -234,3 +234,23 @@ kbd {
 #restart-btn:hover {
   background: #9bbdff;
 }
+
+/* ===== Skins visuales ===== */
+.skin-select {
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 13px;
+  color: var(--toggle-text);
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+.skin-select:hover,
+.skin-select:focus {
+  border-color: #7aa2f7;
+  color: #7aa2f7;
+  outline: none;
+}
