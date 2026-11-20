@@ -1,11 +1,39 @@
 'use strict';
 
+const COLS = 10;
+const ROWS = 20;
+const BLOCK = 30;
+
+const COLORS = [
+  null,
+  '#4dd0e1', // I - cyan
+  '#ffd54f', // O - yellow
+  '#ba68c8', // T - purple
+  '#81c784', // S - green
+  '#e57373', // Z - red
+  '#90caf9', // J - pale blue
+  '#ffb74d', // L - orange
+  '#9e9e9e', // N - tuerca (gris metálico)
+];
+
+const PIECES = [
+  null,
+  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
+  [[2,2],[2,2]],                               // O
+  [[0,3,0],[3,3,3],[0,0,0]],                  // T
+  [[0,4,4],[4,4,0],[0,0,0]],                  // S
+  [[5,5,0],[0,5,5],[0,0,0]],                  // Z
+  [[6,0,0],[6,6,6],[0,0,0]],                  // J
+  [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[8,8,8],[8,0,8],[8,8,8]],                  // N (tuerca)
+];
+
+const LINE_SCORES = [0, 100, 300, 500, 800];
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
 const nextCtx = nextCanvas.getContext('2d');
-const holdCanvas = document.getElementById('hold-canvas');
-const holdCtx = holdCanvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
@@ -13,26 +41,17 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
-const themeToggle = document.getElementById('theme-toggle');
 
-const GRID_COLORS = { dark: '#22222e', light: '#e3e6f0' };
-const BLOCK_SHINE = { dark: 'rgba(255,255,255,0.12)', light: 'rgba(255,255,255,0.35)' };
-let theme = 'dark';
-
-let mode, startLevel = 1, pieceStartScore, gameTime, lastMoveWasRotate, board, current, queue, hold, holdCharges, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 }
 
-function refillQueue() {
-  while (queue.length < 6) {
-    for (const type of newBag()) queue.push(makePiece(type));
-  }
-}
-
-function queueFront(piece) {
-  queue.unshift(piece);
+function randomPiece() {
+  const type = Math.floor(Math.random() * 8) + 1;
+  const shape = PIECES[type].map(row => [...row]);
+  return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
 
 function collide(shape, ox, oy) {
@@ -57,19 +76,13 @@ function rotateCW(shape) {
   return result;
 }
 
-function rotateCCW(shape) {
-  return rotateCW(rotateCW(rotateCW(shape)));
-}
-
 function tryRotate() {
-  const reversed = mode.reverseRotation && level >= REVERSE_FROM_LEVEL;
-  const rotated = reversed ? rotateCCW(current.shape) : rotateCW(current.shape);
+  const rotated = rotateCW(current.shape);
   const kicks = [0, -1, 1, -2, 2];
   for (const kick of kicks) {
     if (!collide(rotated, current.x + kick, current.y)) {
       current.shape = rotated;
       current.x += kick;
-      lastMoveWasRotate = true;
       return;
     }
   }
@@ -83,16 +96,22 @@ function merge() {
 }
 
 function clearLines() {
-  const rows = [];
+  let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(v => v !== 0)) {
       board.splice(r, 1);
       board.unshift(new Array(COLS).fill(0));
-      rows.push(r);
+      cleared++;
       r++;
     }
   }
-  return rows;
+  if (cleared) {
+    lines += cleared;
+    score += (LINE_SCORES[cleared] || 0) * level;
+    level = Math.floor(lines / 10) + 1;
+    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    updateHUD();
+  }
 }
 
 function ghostY() {
@@ -104,7 +123,6 @@ function ghostY() {
 function hardDrop() {
   const gy = ghostY();
   score += (gy - current.y) * 2;
-  if (gy !== current.y) lastMoveWasRotate = false;
   current.y = gy;
   lockPiece();
 }
@@ -112,7 +130,6 @@ function hardDrop() {
 function softDrop() {
   if (!collide(current.shape, current.x, current.y + 1)) {
     current.y++;
-    lastMoveWasRotate = false;
     score += 1;
     updateHUD();
   } else {
@@ -121,98 +138,40 @@ function softDrop() {
 }
 
 function lockPiece() {
-  snapshotForUndo();
-  const tspin = detectTSpin();
-  if (current.power) applyPowerUp(current);
-  else { mode.onPlace(current); merge(); }
-  const rows = clearLines();
-  if (!rows.length) sfx.lock();
-  else popWildcards();
-  scoreLock(rows.length, tspin, rows);
-  gainEnergy(rows.length, tspin);
-  mode.onLock(rows.length);
-  trackPowerSpawn(rows.length);
-  if (rows.length === 4 && specialsEnabled) {
-    queueFront(makePiece(SINGLE));
-    addPopup('¡RECOMPENSA!', '#fff176');
-    sfx.reward();
-  }
+  merge();
+  clearLines();
   spawn();
 }
 
 function spawn() {
-  current = queue.shift();
-  refillQueue();
-  holdCharges = 1;
-  lastMoveWasRotate = false;
-  if (peekPieces > 0) peekPieces--;
-  pieceStartScore = score;
+  current = next;
+  next = randomPiece();
   if (collide(current.shape, current.x, current.y)) {
     endGame();
   }
   drawNext();
-  drawHold();
-}
-
-function doHold() {
-  if (holdCharges <= 0) return;
-  holdCharges--;
-  const stored = { type: current.type, power: current.power };
-  if (hold) {
-    const charges = holdCharges;
-    current = makePiece(hold.type, hold.power);
-    hold = stored;
-    holdCharges = charges;
-    if (collide(current.shape, current.x, current.y)) endGame();
-  } else {
-    hold = stored;
-    const charges = holdCharges;
-    spawn();
-    holdCharges = charges;
-  }
-  drawNext();
-  drawHold();
-}
-
-// Intervalo efectivo: base por nivel × modificadores (congelar detiene la caída).
-function currentDropInterval() {
-  if (isFrozen()) return Infinity;
-  return isSlowed() ? dropInterval * SLOW_FACTOR : dropInterval;
 }
 
 function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
-  updateEnergyBar();
-  if (comboEl) comboEl.textContent = combo >= 1 ? 'x' + (combo + 1) : '-';
 }
 
-function drawBlock(context, x, y, colorIndex, size, alpha, power) {
+function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  let color = (theme === 'light' ? COLORS_LIGHT : COLORS)[colorIndex];
-  if (power) color = POWERUPS[power].color;
-  else if (colorIndex === WILDCARD) color = `hsl(${(gameTime / 8 + x * 40 + y * 25) % 360}, 80%, 60%)`;
+  const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = BLOCK_SHINE[theme];
+  context.fillStyle = 'rgba(255,255,255,0.12)';
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  if (power) {
-    context.font = `${Math.floor(size * 0.65)}px system-ui, sans-serif`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillStyle = '#000';
-    context.fillText(POWERUPS[power].emoji, x * size + size / 2, y * size + size / 2 + 1);
-    context.textAlign = 'start';
-    context.textBaseline = 'alphabetic';
-  }
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = GRID_COLORS[theme];
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--grid-line').trim();
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -235,79 +194,37 @@ function draw() {
   // board
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
-      if (cellVisible(r, c)) drawBlock(ctx, c, r, board[r][c], BLOCK);
+      drawBlock(ctx, c, r, board[r][c], BLOCK);
 
   // ghost
   const gy = ghostY();
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
       if (current.shape[r][c])
-        drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2, current.power);
+        drawBlock(ctx, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
 
   // current piece
   for (let r = 0; r < current.shape.length; r++)
     for (let c = 0; c < current.shape[r].length; c++)
-      drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK, 1, current.power);
-
-  drawEffects();
-}
-
-function drawPreview(c2d, cv, shape, alpha, power, region) {
-  const rg = region || { x: 0, y: 0, w: cv.width, h: cv.height };
-  c2d.clearRect(rg.x, rg.y, rg.w, rg.h);
-  if (!shape) return;
-  const rows = shape.length, cols = shape[0].length;
-  const size = Math.min(30, Math.floor(rg.w / (Math.max(rows, cols) + 1)), Math.floor(rg.h / (rows + 1)));
-  const ox = rg.x + (rg.w - cols * size) / 2;
-  const oy = rg.y + (rg.h - rows * size) / 2;
-  c2d.save();
-  c2d.translate(ox, oy);
-  for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; c++)
-      drawBlock(c2d, c, r, shape[r][c], size, alpha, power);
-  c2d.restore();
+      drawBlock(ctx, current.x + c, current.y + r, current.shape[r][c], BLOCK);
 }
 
 function drawNext() {
-  const peek = peekPieces > 0;
-  const h = peek ? 300 : 120;
-  if (nextCanvas.height !== h) nextCanvas.height = h;
-  if (!peek) {
-    drawPreview(nextCtx, nextCanvas, queue[0].shape, 1, queue[0].power);
-    return;
-  }
+  const NB = 30;
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-  for (let i = 0; i < 5; i++) {
-    drawPreview(nextCtx, nextCanvas, queue[i].shape, 1, queue[i].power, { x: 0, y: i * 60, w: 120, h: 60 });
-  }
+  const shape = next.shape;
+  const offX = Math.floor((4 - shape[0].length) / 2);
+  const offY = Math.floor((4 - shape.length) / 2);
+  for (let r = 0; r < shape.length; r++)
+    for (let c = 0; c < shape[r].length; c++)
+      drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
 }
 
-function drawHold() {
-  holdCanvas.classList.toggle('locked', holdCharges <= 0);
-  drawPreview(holdCtx, holdCanvas, hold ? PIECES[hold.type] : null, 1, hold && hold.power);
-}
-
-function setTheme(t, save = true) {
-  theme = t === 'light' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = theme;
-  themeToggle.textContent = theme === 'light' ? '🌙 Oscuro' : '☀️ Claro';
-  themeToggle.setAttribute('aria-pressed', String(theme === 'light'));
-  if (save) {
-    try { localStorage.setItem('theme', theme); } catch (e) {}
-  }
-  // El bucle está detenido en pausa/game over: repintar manualmente
-  if (current && queue) { draw(); drawNext(); drawHold(); }
-}
-
-function endGame(win = false) {
-  if (gameOver) return;
+function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
-  overlay.classList.toggle('win', win);
-  overlayTitle.textContent = win ? '¡OBJETIVO CUMPLIDO!' : (mode.lossReason || 'GAME OVER');
-  let text = `Puntuación: ${score.toLocaleString()}`;
-  if (mode.id !== 'marathon') text += ` · Tiempo: ${fmtTime(gameTime)}`;
-  overlayScore.textContent = text;
+  overlayTitle.textContent = 'GAME OVER';
+  overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
 }
 
@@ -326,76 +243,49 @@ function togglePause() {
 }
 
 function loop(ts) {
-  if (gameOver || paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
-  gameTime += dt;
   dropAccum += dt;
-  if (dropAccum >= currentDropInterval()) {
+  if (dropAccum >= dropInterval) {
     dropAccum = 0;
     if (!collide(current.shape, current.x, current.y + 1)) {
       current.y++;
-      lastMoveWasRotate = false;
     } else {
       lockPiece();
     }
   }
-  mode.onTick(dt);
-  const result = mode.check();
-  if (result && !gameOver) endGame(result === 'win');
-  updateModeHUD();
+  if (gameOver) return;
   draw();
-  if (gameOver) return; // endGame() ocurrió dentro de este frame: no reprogramar
   animId = requestAnimationFrame(loop);
 }
 
-function init(m) {
-  if (m && m.id) mode = m;
-  specialsEnabled = mode.flags.specials;
-  powerupsEnabled = mode.flags.powerups;
-  abilitiesEnabled = mode.flags.abilities;
-  document.getElementById('energy-section').classList.toggle('hidden', !abilitiesEnabled);
-  overlay.classList.remove('win');
-  startLevel = mode.startLevel || 1;
+function init() {
   board = createBoard();
-  gameTime = 0;
-  lastMoveWasRotate = false;
-  resetScoring();
-  resetPowerups();
-  resetAbilities();
   score = 0;
   lines = 0;
-  level = startLevel;
+  level = 1;
   paused = false;
   gameOver = false;
-  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  dropInterval = 1000;
   dropAccum = 0;
   lastTime = performance.now();
-  queue = [];
-  hold = null;
-  holdCharges = 1;
-  mode.setup();
-  refillQueue();
+  next = randomPiece();
   spawn();
   updateHUD();
-  updateModeHUD();
   overlay.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  ensureAudio();
-  if (abilityMenu) { handleAbilityKey(e); return; }
-  if (e.code === 'KeyM') { toggleMute(); return; }
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
-      if (!collide(current.shape, current.x - 1, current.y)) { current.x--; lastMoveWasRotate = false; }
+      if (!collide(current.shape, current.x - 1, current.y)) current.x--;
       break;
     case 'ArrowRight':
-      if (!collide(current.shape, current.x + 1, current.y)) { current.x++; lastMoveWasRotate = false; }
+      if (!collide(current.shape, current.x + 1, current.y)) current.x++;
       break;
     case 'ArrowDown':
       softDrop();
@@ -408,14 +298,35 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       hardDrop();
       break;
-    case 'KeyE':
-      openAbilityMenu();
-      break;
-    case 'KeyC':
-    case 'ShiftLeft':
-    case 'ShiftRight':
-      doHold();
-      break;
   }
   updateHUD();
 });
+
+restartBtn.addEventListener('click', init);
+
+const themeToggle = document.getElementById('theme-toggle');
+const toggleIcon = themeToggle.querySelector('.toggle-icon');
+const toggleLabel = themeToggle.querySelector('.toggle-label');
+
+function applyTheme(isLight) {
+  if (isLight) {
+    document.body.classList.add('light-mode');
+    toggleIcon.textContent = '☀';
+    toggleLabel.textContent = 'DARK';
+  } else {
+    document.body.classList.remove('light-mode');
+    toggleIcon.textContent = '☾';
+    toggleLabel.textContent = 'LIGHT';
+  }
+}
+
+const savedTheme = localStorage.getItem('tetris-theme');
+applyTheme(savedTheme === 'light');
+
+themeToggle.addEventListener('click', () => {
+  const isLight = !document.body.classList.contains('light-mode');
+  applyTheme(isLight);
+  localStorage.setItem('tetris-theme', isLight ? 'light' : 'dark');
+});
+
+init();
