@@ -42,7 +42,7 @@
             <li><kbd>↑</kbd> rotar</li>
             <li><kbd>↓</kbd> bajar</li>
             <li><kbd>Space</kbd> caída</li>
-            <li><kbd>P</kbd> pausa</li>
+            <li><kbd>P</kbd>/<kbd>Esc</kbd> pausa</li>
           </ul>
         </div>
       </aside>
@@ -55,8 +55,31 @@
         <button id="restart-btn">Reiniciar</button>
       </div>
     </div>
+
+    <div id="pause-menu" class="overlay hidden">
+      <div class="overlay-box pm-box">
+        <p id="pm-title">PAUSA</p>
+        <button class="pm-item" data-action="resume">Reanudar</button>
+        <button class="pm-item" data-action="restart">Reiniciar</button>
+        <button class="pm-item" data-action="controls">Ver controles</button>
+        <ul id="pm-controls" class="hidden">
+          <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+          <li><kbd>↑</kbd> / <kbd>X</kbd> rotar</li>
+          <li><kbd>↓</kbd> bajar</li>
+          <li><kbd>Space</kbd> caída</li>
+          <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
+        </ul>
+        <div class="pm-item pm-level" data-action="level" tabindex="0">
+          <span>NIVEL INICIAL</span>
+          <button type="button" tabindex="-1" data-step="-1" aria-label="Bajar nivel">&minus;</button>
+          <strong id="pm-level-value">1</strong>
+          <button type="button" tabindex="-1" data-step="1" aria-label="Subir nivel">+</button>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <script src="pause.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
