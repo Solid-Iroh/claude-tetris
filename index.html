@@ -52,11 +52,28 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <p id="record-badge" class="record-badge hidden">¡RÉCORD!</p>
+        <div id="record-entry" class="record-entry hidden">
+          <input id="name-input" type="text" maxlength="12" placeholder="Tu nombre" autocomplete="off" />
+          <button id="save-record-btn">Guardar</button>
+        </div>
+        <div id="overlay-records"></div>
         <button id="restart-btn">Reiniciar</button>
+      </div>
+    </div>
+
+    <div id="start-screen" class="overlay hidden">
+      <div class="overlay-box">
+        <p class="start-title">TETRIS</p>
+        <p class="records-title">MEJORES PUNTUACIONES</p>
+        <div id="start-records"></div>
+        <button id="play-btn">JUGAR</button>
+        <button id="reset-records-btn" class="secondary-btn">Borrar records</button>
       </div>
     </div>
   </div>
 
+  <script src="records.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

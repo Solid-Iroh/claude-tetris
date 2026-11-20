@@ -234,3 +234,109 @@ kbd {
 #restart-btn:hover {
   background: #9bbdff;
 }
+
+/* ---- Records (tabla de puntuaciones locales) ---- */
+.start-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: #7aa2f7;
+}
+
+.records-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--label);
+}
+
+.records-table {
+  border-collapse: collapse;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 260px;
+}
+
+.records-table th {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--label);
+  padding: 3px 8px;
+}
+
+.records-table td {
+  padding: 3px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.records-table td:nth-child(2) { text-align: left; }
+.records-table td:nth-child(3),
+.records-table td:nth-child(4) { text-align: right; }
+
+.records-table tr.highlight td {
+  background: rgba(122, 162, 247, 0.25);
+  color: #7aa2f7;
+  font-weight: 700;
+}
+
+.records-stats {
+  margin-top: 6px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--label);
+}
+
+.record-badge {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #ffd54f;
+}
+
+.record-entry {
+  display: flex;
+  gap: 8px;
+}
+
+.record-entry.hidden,
+.record-badge.hidden { display: none; }
+
+#name-input {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  width: 140px;
+}
+
+#play-btn,
+#save-record-btn {
+  background: #7aa2f7;
+  color: #0f0f17;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+#play-btn:hover,
+#save-record-btn:hover { background: #9bbdff; }
+
+.secondary-btn {
+  background: transparent;
+  color: var(--label);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.secondary-btn:hover { color: #e57373; border-color: #e57373; }

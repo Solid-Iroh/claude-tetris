@@ -95,6 +95,8 @@ function merge() {
         board[current.y + r][current.x + c] = current.shape[r][c];
 }
 
+let combo = 0, maxCombo = 0;
+
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
@@ -106,11 +108,15 @@ function clearLines() {
     }
   }
   if (cleared) {
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
+  } else {
+    combo = 0;
   }
 }
 
@@ -226,6 +232,7 @@ function endGame() {
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
+  Records.onGameOver({ score, lines, level, maxCombo });
 }
 
 function togglePause() {
@@ -264,6 +271,9 @@ function init() {
   score = 0;
   lines = 0;
   level = 1;
+  combo = 0;
+  maxCombo = 0;
+  Records.resetUI();
   paused = false;
   gameOver = false;
   dropInterval = 1000;
@@ -278,6 +288,7 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
+  if (Records.isUIOpen()) return;
   if (e.code === 'KeyP') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
@@ -329,4 +340,5 @@ themeToggle.addEventListener('click', () => {
   localStorage.setItem('tetris-theme', isLight ? 'light' : 'dark');
 });
 
-init();
+Records.bind(init);
+Records.showStart();
